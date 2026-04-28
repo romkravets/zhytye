@@ -220,7 +220,7 @@ ${profileLines.join('\n')}
     clearInterval(msgInt);
     setEvents(evs);
     setDay(0);
-    setMoney(0);
+    setMoney(netSalary);
     setMood(80);
     setHealth(80);
     setSocial(80);
@@ -229,7 +229,7 @@ ${profileLines.join('\n')}
     setIsPaused(false);
     setLog([{
       day: 0,
-      text: `${cityData.name}. На руки: ${netSalary.toLocaleString('uk-UA')} грн/міс. Поїхали.`,
+      text: `${cityData.name}. Стартовий баланс: ${netSalary.toLocaleString('uk-UA')} грн (минулий місяць). Поїхали.`,
       type: 'info'
     }]);
     setPhase('playing');
@@ -250,11 +250,22 @@ ${profileLines.join('\n')}
         const nextDay = prevDay + 1;
         if (nextDay > SIM_DAYS) return prevDay;
 
+        // Guard: prevent double-processing the same day if the interval fires
+        // twice (e.g. effect re-mount race condition in dev/StrictMode)
+        const dayKey = `d${nextDay}`;
+        if (appliedDaysRef.current.has(dayKey)) return nextDay;
+        appliedDaysRef.current.add(dayKey);
+
         const newLogs = [];
         let dM = 0;
-        let dMood = -0.7;
-        let dHealth = -0.4;
+        let dMood = -0.5;
+        let dHealth = -0.3;
         let dSocial = -1.0 / socFactor;
+
+        // Фінансовий буфер знижує стрес: великий залишок → менший спад настрою
+        if (surplus > 20000) dMood += 0.15;
+        else if (surplus > 8000) dMood += 0.08;
+        else if (surplus > 3000) dMood += 0.03;
 
         dM -= dailyVariable;
 
@@ -287,6 +298,8 @@ ${profileLines.join('\n')}
         }
         if (dInMonth === 15) {
           dM += netSalary;
+          dMood += 3;  // зарплата знімає напругу
+          dSocial += 1;
           newLogs.push({ day: nextDay, text: `Зарплата +${netSalary.toLocaleString('uk-UA')} грн`, type: 'income' });
         }
         if (dInMonth === 25) {
@@ -323,7 +336,7 @@ ${profileLines.join('\n')}
     }, 1000 / speed);
 
     return () => clearInterval(id);
-  }, [phase, isPaused, speed, events, cityData, famMul, housingMul, netSalary, dailyVariable, transport, subs, gym, pets, friends]);
+  }, [phase, isPaused, speed, events, cityData, famMul, housingMul, netSalary, dailyVariable, transport, subs, gym, pets, friends, surplus]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
@@ -337,7 +350,7 @@ ${profileLines.join('\n')}
       setVerdict({ status: 'sick', day, money, mood, health, social });
       setPhase('gameover');
     } else if (mood <= 0) {
-      setVerdict({ status: 'burnout', day, money, mood, health, social });
+      setVerdict({ status: 'burnout', day, money, mood, health, social, cause: social < 10 ? 'isolation' : 'events' });
       setPhase('gameover');
     }
   }, [day, money, health, mood, social, phase]);
@@ -579,11 +592,15 @@ ${profileLines.join('\n')}
       sick:     'Здоровʼя на нулі.',
       burnout:  'Вигорів.',
     };
+    const burnoutReason = verdict.cause === 'isolation'
+      ? `Соціальна ізоляція вбила настрій. Мало спілкування → хронічний стрес → вигорання на день ${verdict.day}.`
+      : `Накопичення стресових подій переважило фінансовий комфорт. День ${verdict.day}.`;
+
     const verdictSubs = {
       survived: money > 5000 ? 'Ще й накопичив трошки.' : money > 0 ? 'Ледь дотягнув до фінішу.' : 'Але мінусом до карти.',
       bankrupt: `Заборг по оренді й продуктах на ${verdict.day} день.`,
       sick:     `Лікарня замість роботи. День ${verdict.day}.`,
-      burnout:  `Не витягнув емоційно. День ${verdict.day}.`,
+      burnout:  burnoutReason,
     };
 
     return (
