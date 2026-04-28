@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Loader2 } from 'lucide-react';
+import { useTranslation } from '../lib/i18n';
 
 // ============== STATIC DATA ==============
 const CITIES = {
@@ -68,6 +69,13 @@ const FAMILY = {
 
 const SIM_DAYS = 90;
 
+const SAVINGS_PRESETS = [
+  { key: 'zero',  label: '0',       months: 0 },
+  { key: 'one',   label: '1 міс',   months: 1 },
+  { key: 'three', label: '3 міс',   months: 3 },
+  { key: 'six',   label: '6 міс',   months: 6 },
+];
+
 // ============== HELPERS ==============
 function calcNet(gross, type) {
   switch (type) {
@@ -98,6 +106,9 @@ const FALLBACK_EVENTS = [
 
 // ============== APP ==============
 export default function ZhyteSimulator() {
+  const [lang, setLang] = useState('uk');
+  const t = useTranslation(lang);
+
   const [phase, setPhase] = useState('setup');
   const [loadMsg, setLoadMsg] = useState('');
 
@@ -114,6 +125,7 @@ export default function ZhyteSimulator() {
   const [friends, setFriends] = useState('normal');
   const [bday, setBday] = useState(false);
   const [holiday, setHoliday] = useState(false);
+  const [savingsKey, setSavingsKey] = useState('one');
 
   const [day, setDay] = useState(0);
   const [money, setMoney] = useState(0);
@@ -150,6 +162,8 @@ export default function ZhyteSimulator() {
 
   const monthlyEstimate = monthlyFixed + dailyVariable * 30;
   const surplus = netSalary - monthlyEstimate;
+  const savingsMonths = SAVINGS_PRESETS.find(p => p.key === savingsKey)?.months ?? 1;
+  const savingsAmount = Math.round(netSalary * savingsMonths);
 
   // ============== AI EVENTS ==============
   async function generateEvents() {
@@ -195,12 +209,7 @@ ${profileLines.join('\n')}
 
   async function startSim() {
     setPhase('loading');
-    const messages = [
-      'ШІ продумує твоє життя...',
-      'Прогнозує блекаути...',
-      'Дзвонить орендодавцю...',
-      'Радиться з друзями...',
-    ];
+    const messages = t('loadMsgs');
     let i = 0;
     setLoadMsg(messages[0]);
     const msgInt = setInterval(() => {
@@ -220,16 +229,19 @@ ${profileLines.join('\n')}
     clearInterval(msgInt);
     setEvents(evs);
     setDay(0);
-    setMoney(netSalary);
+    setMoney(savingsAmount);
     setMood(80);
     setHealth(80);
     setSocial(80);
     appliedDaysRef.current = new Set();
     setVerdict(null);
     setIsPaused(false);
+    const savingsLabel = savingsAmount === 0
+      ? t('savingsZero')
+      : t('savingsLabel', savingsAmount, savingsMonths);
     setLog([{
       day: 0,
-      text: `${cityData.name}. Стартовий баланс: ${netSalary.toLocaleString('uk-UA')} грн (минулий місяць). Поїхали.`,
+      text: `${cityData.name}. ${savingsLabel}. ${lang === 'uk' ? 'Поїхали.' : 'Go.'}`,
       type: 'info'
     }]);
     setPhase('playing');
@@ -275,7 +287,7 @@ ${profileLines.join('\n')}
           const rent = Math.round(cityData.rent * famMul * housingMul);
           if (rent > 0) {
             dM -= rent;
-            newLogs.push({ day: nextDay, text: `Оренда −${rent.toLocaleString('uk-UA')} грн`, type: 'expense' });
+            newLogs.push({ day: nextDay, text: t('logRent', rent), type: 'expense' });
           }
         }
         if (dInMonth === 3) {
@@ -286,30 +298,29 @@ ${profileLines.join('\n')}
           if (fixedExtra > 0) {
             dM -= fixedExtra;
             const parts = [];
-            if (trM) parts.push(`транспорт ${trM}`);
-            if (subM) parts.push(`підписки ${subM}`);
-            if (gymM) parts.push(`зал ${gymM}`);
-            newLogs.push({ day: nextDay, text: `Фіксовані: ${parts.join(', ')} −${fixedExtra.toLocaleString('uk-UA')} грн`, type: 'expense' });
+            if (trM) parts.push(t('logTransport', trM));
+            if (subM) parts.push(t('logSubs', subM));
+            if (gymM) parts.push(t('logGym', gymM));
+            newLogs.push({ day: nextDay, text: t('logFixedCosts', fixedExtra, parts), type: 'expense' });
           }
         }
         if (dInMonth === 7 && PETS[pets].monthly > 0) {
           dM -= PETS[pets].monthly;
-          newLogs.push({ day: nextDay, text: `Корм для тварин −${PETS[pets].monthly.toLocaleString('uk-UA')} грн`, type: 'expense' });
+          newLogs.push({ day: nextDay, text: t('logPets', PETS[pets].monthly), type: 'expense' });
         }
         if (dInMonth === 15) {
           dM += netSalary;
-          dMood += 3;  // зарплата знімає напругу
+          dMood += 3;
           dSocial += 1;
-          newLogs.push({ day: nextDay, text: `Зарплата +${netSalary.toLocaleString('uk-UA')} грн`, type: 'income' });
+          newLogs.push({ day: nextDay, text: t('logSalary', netSalary), type: 'income' });
         }
         if (dInMonth === 25) {
           dM -= cityData.utilities;
-          newLogs.push({ day: nextDay, text: `Комуналка та інтернет −${cityData.utilities.toLocaleString('uk-UA')} грн`, type: 'expense' });
+          newLogs.push({ day: nextDay, text: t('logUtilities', cityData.utilities), type: 'expense' });
         }
 
         const evt = events.find(e => e.day === nextDay);
-        if (evt && !appliedDaysRef.current.has(nextDay)) {
-          appliedDaysRef.current.add(nextDay);
+        if (evt) {
           dM += (evt.moneyChange || 0);
           dMood += (evt.moodChange || 0);
           dHealth += (evt.healthChange || 0);
@@ -336,7 +347,7 @@ ${profileLines.join('\n')}
     }, 1000 / speed);
 
     return () => clearInterval(id);
-  }, [phase, isPaused, speed, events, cityData, famMul, housingMul, netSalary, dailyVariable, transport, subs, gym, pets, friends, surplus]);
+  }, [phase, isPaused, speed, events, cityData, famMul, housingMul, netSalary, dailyVariable, transport, subs, gym, pets, friends, surplus, t]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
@@ -366,14 +377,25 @@ ${profileLines.join('\n')}
       <>
         <div className="grain relative min-h-screen w-full" style={{ background: '#F2EBE0', color: '#1a1a1a' }}>
           <div className="max-w-3xl mx-auto px-6 py-12 md:py-16">
-            <div className="mb-2 f-mono text-xs uppercase tracking-widest opacity-60">№ 002 · симулятор · 2026</div>
-            <h1 className="f-display text-7xl md:text-9xl leading-[0.9] mb-4">Жите-<br/><span className="italic">здатність</span></h1>
+            {/* Language toggle */}
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => setLang(l => l === 'uk' ? 'en' : 'uk')}
+                className="f-mono text-xs px-3 py-1 border-2 hover:bg-black hover:text-[#F2EBE0] transition-colors"
+                style={{ borderColor: '#1a1a1a' }}
+              >{t('langLabel')}</button>
+            </div>
+
+            <div className="mb-2 f-mono text-xs uppercase tracking-widest opacity-60">{t('serialNo')}</div>
+            <h1 className="f-display text-7xl md:text-9xl leading-[0.9] mb-4">
+              {t('titleLine1')}<br/><span className="italic">{t('titleLine2')}</span>
+            </h1>
             <p className="f-body text-base md:text-lg max-w-md opacity-80 mb-2 leading-relaxed">
-              Налаштуй профіль, побач прогноз бюджету, потім дай ШІ зіграти 90 днів життя.
+              {t('subtitle')}
             </p>
 
-            <Section title="Дохід">
-              <Field label="Зарплата (грн, брутто/міс)">
+            <Section title={t('sIncome')}>
+              <Field label={t('fSalary')}>
                 <input
                   type="number"
                   value={salary}
@@ -381,24 +403,43 @@ ${profileLines.join('\n')}
                   className="f-mono text-3xl bg-transparent w-full border-b-2 outline-none pb-2"
                   style={{ borderColor: '#1a1a1a' }}
                   placeholder="25000"
+                  min="0"
+                  max="9999999"
                 />
               </Field>
-              <Field label="Тип зайнятості">
+              <Field label={t('fEmpType')}>
                 <Toggle
                   options={Object.entries(EMP_TYPES).map(([k, v]) => ({ v: k, label: v.label, sub: v.sub }))}
                   value={empType} onChange={setEmpType}
                 />
               </Field>
+              <Field label={t('fSavings')}>
+                <Toggle
+                  options={SAVINGS_PRESETS.map(p => ({
+                    v: p.key,
+                    label: p.label,
+                    sub: p.months === 0
+                      ? t('savingsBareSub')
+                      : `≈${(netSalary * p.months).toLocaleString('uk-UA')} грн`,
+                  }))}
+                  value={savingsKey} onChange={setSavingsKey}
+                />
+                {savingsMonths > 0 && (
+                  <div className="f-mono text-xs opacity-60 mt-2">
+                    {t('savingsHint', savingsAmount)}
+                  </div>
+                )}
+              </Field>
             </Section>
 
-            <Section title="Житло">
-              <Field label="Місто">
+            <Section title={t('sHousing')}>
+              <Field label={t('fCity')}>
                 <Toggle
                   options={Object.entries(CITIES).map(([k, v]) => ({ v: k, label: v.name, sub: v.vibe }))}
                   value={city} onChange={setCity}
                 />
               </Field>
-              <Field label="Тип житла">
+              <Field label={t('fHousingType')}>
                 <Toggle
                   options={Object.entries(HOUSING).map(([k, v]) => ({ v: k, label: v.label, sub: v.sub }))}
                   value={housing} onChange={setHousing}
@@ -406,8 +447,8 @@ ${profileLines.join('\n')}
               </Field>
             </Section>
 
-            <Section title="Транспорт">
-              <Field label="Як пересуваєшся">
+            <Section title={t('sTransport')}>
+              <Field label={t('fTransport')}>
                 <Toggle
                   options={Object.entries(TRANSPORT).map(([k, v]) => ({ v: k, label: v.label, sub: v.sub }))}
                   value={transport} onChange={setTransport}
@@ -415,26 +456,26 @@ ${profileLines.join('\n')}
               </Field>
             </Section>
 
-            <Section title="Спосіб життя">
-              <Field label="Тварини">
+            <Section title={t('sLifestyle')}>
+              <Field label={t('fPets')}>
                 <Toggle
                   options={Object.entries(PETS).map(([k, v]) => ({ v: k, label: v.label, sub: v.monthly ? `${v.monthly}/міс` : '' }))}
                   value={pets} onChange={setPets}
                 />
               </Field>
-              <Field label="Підписки">
+              <Field label={t('fSubs')}>
                 <Toggle
                   options={Object.entries(SUBS).map(([k, v]) => ({ v: k, label: v.label, sub: v.monthly ? `${v.monthly}/міс` : 'безкоштовно' }))}
                   value={subs} onChange={setSubs}
                 />
               </Field>
-              <Field label="Кафе/ресторани">
+              <Field label={t('fEating')}>
                 <Toggle
                   options={Object.entries(EATING).map(([k, v]) => ({ v: k, label: v.label, sub: v.daily ? `≈${v.daily * 30}/міс` : '−' }))}
                   value={eating} onChange={setEating}
                 />
               </Field>
-              <Field label="Спортзал">
+              <Field label={t('fGym')}>
                 <Toggle
                   options={[
                     { v: false, label: 'ні',  sub: '−'       },
@@ -445,26 +486,26 @@ ${profileLines.join('\n')}
               </Field>
             </Section>
 
-            <Section title="Соціальне">
-              <Field label="З ким живеш">
+            <Section title={t('sSocial')}>
+              <Field label={t('fFamily')}>
                 <Toggle
                   options={Object.entries(FAMILY).map(([k, v]) => ({ v: k, label: v.label, sub: `×${v.mul}` }))}
                   value={family} onChange={setFamily}
                 />
               </Field>
-              <Field label="Активність зі знайомими">
+              <Field label={t('fFriends')}>
                 <Toggle
                   options={Object.entries(FRIENDS).map(([k, v]) => ({ v: k, label: v.label, sub: `${v.eventCount} подій` }))}
                   value={friends} onChange={setFriends}
                 />
               </Field>
-              <Field label="Свій ДН у цей період?">
+              <Field label={t('fBday')}>
                 <Toggle
                   options={[{ v: false, label: 'ні' }, { v: true, label: 'так', sub: '−2 500' }]}
                   value={bday} onChange={setBday}
                 />
               </Field>
-              <Field label="Велике свято (НР, Різдво, ін.)?">
+              <Field label={t('fHoliday')}>
                 <Toggle
                   options={[{ v: false, label: 'ні' }, { v: true, label: 'так', sub: '−3 000' }]}
                   value={holiday} onChange={setHoliday}
@@ -477,6 +518,7 @@ ${profileLines.join('\n')}
               monthlyFixed={monthlyFixed}
               dailyVariable={dailyVariable}
               surplus={surplus}
+              t={t}
             />
 
             <button
@@ -485,12 +527,12 @@ ${profileLines.join('\n')}
               className="mt-12 group inline-flex items-center gap-3 f-display text-3xl md:text-4xl italic underline underline-offset-8 decoration-2 hover:decoration-4 transition-all disabled:opacity-30"
               style={{ textDecorationColor: '#C44536' }}
             >
-              почати симуляцію
+              {t('startButton')}
               <span className="not-italic transition-transform group-hover:translate-x-2">→</span>
             </button>
 
             <div className="mt-16 mb-8 f-mono text-xs opacity-50 max-w-md leading-relaxed">
-              90 днів = ~45 секунд при швидкості ×2. ШІ генерує події один раз на старті з урахуванням профілю. Дані не зберігаються.
+              {t('footerNote')}
             </div>
           </div>
         </div>
@@ -521,7 +563,7 @@ ${profileLines.join('\n')}
           <div className="max-w-6xl mx-auto px-4 md:px-8 py-6">
             <div className="flex items-center justify-between mb-8 pb-4 border-b" style={{ borderColor: '#1a1a1a33' }}>
               <div>
-                <div className="f-mono text-xs uppercase tracking-widest opacity-60">день</div>
+                <div className="f-mono text-xs uppercase tracking-widest opacity-60">{t('pDay')}</div>
                 <div className="f-display text-5xl md:text-6xl leading-none">
                   {String(day).padStart(2, '0')}
                   <span className="opacity-30 text-3xl md:text-4xl">/{SIM_DAYS}</span>
@@ -545,7 +587,7 @@ ${profileLines.join('\n')}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
               <div className="md:col-span-2 space-y-8">
                 <div>
-                  <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-1">баланс</div>
+                  <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-1">{t('pBalance')}</div>
                   <div className="f-display text-6xl md:text-7xl leading-none transition-colors" style={{ color: moneyColor }}>
                     {money < 0 ? '−' : ''}{Math.abs(money).toLocaleString('uk-UA')}
                     <span className="text-2xl md:text-3xl opacity-50 ml-2">грн</span>
@@ -553,22 +595,23 @@ ${profileLines.join('\n')}
                 </div>
 
                 <div className="space-y-4">
-                  <Bar label="настрій"   value={mood}   color="#C44536" />
-                  <Bar label="здоровʼя" value={health} color="#2E5266" />
-                  <Bar label="соц"       value={social} color="#7B6D47" />
+                  <Bar label={t('pMood')}   value={mood}   color="#C44536" />
+                  <Bar label={t('pHealth')} value={health} color="#2E5266" />
+                  <Bar label={t('pSocial')} value={social} color="#7B6D47" />
                 </div>
 
                 <div className="pt-4 border-t f-mono text-xs space-y-1 opacity-70" style={{ borderColor: '#1a1a1a33' }}>
-                  <Row k="місто"        v={cityData.name} />
-                  <Row k="зайнятість"  v={EMP_TYPES[empType].label} />
-                  <Row k="на руки/міс" v={`${netSalary.toLocaleString('uk-UA')} грн`} />
-                  <Row k="фікс/міс"    v={`${monthlyFixed.toLocaleString('uk-UA')} грн`} />
-                  <Row k="змін/день"   v={`${dailyVariable.toLocaleString('uk-UA')} грн`} />
+                  <Row k={t('pCity')}    v={cityData.name} />
+                  <Row k={t('pEmp')}     v={EMP_TYPES[empType].label} />
+                  <Row k={t('pNet')}     v={`${netSalary.toLocaleString('uk-UA')} грн`} />
+                  <Row k={t('pSavings')} v={savingsAmount === 0 ? t('pZeroSavings') : `${savingsAmount.toLocaleString('uk-UA')} грн`} />
+                  <Row k={t('pFixed')}   v={`${monthlyFixed.toLocaleString('uk-UA')} грн`} />
+                  <Row k={t('pDaily')}   v={`${dailyVariable.toLocaleString('uk-UA')} грн`} />
                 </div>
               </div>
 
               <div className="md:col-span-3">
-                <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-3">хроніка</div>
+                <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-3">{t('pLog')}</div>
                 <div
                   ref={logRef}
                   className="h-[420px] md:h-[520px] overflow-y-auto pr-2 space-y-1"
@@ -587,19 +630,19 @@ ${profileLines.join('\n')}
   // ============== GAMEOVER ==============
   if (phase === 'gameover' && verdict) {
     const titles = {
-      survived: 'Прожив 90 днів.',
-      bankrupt: 'Збанкрутував.',
-      sick:     'Здоровʼя на нулі.',
-      burnout:  'Вигорів.',
+      survived: t('goSurvived'),
+      bankrupt: t('goBankrupt'),
+      sick:     t('goSick'),
+      burnout:  t('goBurnout'),
     };
     const burnoutReason = verdict.cause === 'isolation'
-      ? `Соціальна ізоляція вбила настрій. Мало спілкування → хронічний стрес → вигорання на день ${verdict.day}.`
-      : `Накопичення стресових подій переважило фінансовий комфорт. День ${verdict.day}.`;
+      ? t('goBurnoutIsolation', verdict.day)
+      : t('goBurnoutEvents', verdict.day);
 
     const verdictSubs = {
-      survived: money > 5000 ? 'Ще й накопичив трошки.' : money > 0 ? 'Ледь дотягнув до фінішу.' : 'Але мінусом до карти.',
-      bankrupt: `Заборг по оренді й продуктах на ${verdict.day} день.`,
-      sick:     `Лікарня замість роботи. День ${verdict.day}.`,
+      survived: verdict.money > 5000 ? t('goSubSurvivedGood') : verdict.money > 0 ? t('goSubSurvivedMarginal') : t('goSubSurvivedNeg'),
+      bankrupt: t('goBankruptSub', verdict.day),
+      sick:     t('goSickSub', verdict.day),
       burnout:  burnoutReason,
     };
 
@@ -607,17 +650,17 @@ ${profileLines.join('\n')}
       <>
         <div className="grain relative min-h-screen w-full flex items-center justify-center" style={{ background: '#F2EBE0', color: '#1a1a1a' }}>
           <div className="max-w-2xl mx-auto px-6 py-12 text-center">
-            <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-4">вердикт</div>
+            <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-4">{t('goVerdict')}</div>
             <h2 className="f-display text-6xl md:text-8xl leading-[0.9] mb-4">
               <span className="italic">{titles[verdict.status]}</span>
             </h2>
             <p className="f-body text-lg opacity-80 mb-12">{verdictSubs[verdict.status]}</p>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 text-left">
-              <Stat label="баланс"   v={`${verdict.money < 0 ? '−' : ''}${Math.abs(verdict.money).toLocaleString('uk-UA')}`} unit="грн" warn={verdict.money < 0} />
-              <Stat label="настрій"  v={Math.round(verdict.mood)}   unit="/100" />
-              <Stat label="здоровʼя" v={Math.round(verdict.health)} unit="/100" />
-              <Stat label="соц"      v={Math.round(verdict.social)} unit="/100" />
+              <Stat label={t('goBalance')} v={`${verdict.money < 0 ? '−' : ''}${Math.abs(verdict.money).toLocaleString('uk-UA')}`} unit="грн" warn={verdict.money < 0} />
+              <Stat label={t('goMood')}    v={Math.round(verdict.mood)}   unit="/100" />
+              <Stat label={t('goHealth')}  v={Math.round(verdict.health)} unit="/100" />
+              <Stat label={t('goSocial')}  v={Math.round(verdict.social)} unit="/100" />
             </div>
 
             <button
@@ -626,7 +669,7 @@ ${profileLines.join('\n')}
               style={{ textDecorationColor: '#C44536' }}
             >
               <RotateCcw className="w-6 h-6 not-italic" />
-              ще раз
+              {t('resetButton')}
             </button>
           </div>
         </div>
@@ -681,25 +724,25 @@ function Toggle({ options, value, onChange }) {
   );
 }
 
-function Summary({ netSalary, monthlyFixed, dailyVariable, surplus }) {
+function Summary({ netSalary, monthlyFixed, dailyVariable, surplus, t }) {
   const negative = surplus < 0;
   const verdict =
-    negative          ? 'Уже мінус — без подій. Ризикуєш збанкрутувати на 1-му ж місяці.' :
-    surplus < 3000    ? 'Тонкий запас. Будь-яка несподіванка зʼїсть його.' :
-    surplus < 8000    ? 'Маржа є, але не велика. Ризики є.' :
-                        'Хороший запас — спокій.';
+    negative          ? t('surplusNeg') :
+    surplus < 3000    ? t('surplusLow') :
+    surplus < 8000    ? t('surplusMid') :
+                        t('surplusOk');
 
   return (
     <div className="mt-12 pt-8 border-t-2" style={{ borderColor: '#1a1a1a' }}>
-      <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-6">— попередній розрахунок —</div>
+      <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-6">— {t('sSummaryTitle')} —</div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <SumCell label="на руки/міс"        value={`+${netSalary.toLocaleString('uk-UA')}`} />
-        <SumCell label="фікс/міс"           value={`−${monthlyFixed.toLocaleString('uk-UA')}`} />
-        <SumCell label="їжа+транспорт/день" value={`−${dailyVariable.toLocaleString('uk-UA')}`} />
-        <SumCell label="≈ змінні/міс"       value={`−${(dailyVariable * 30).toLocaleString('uk-UA')}`} />
+        <SumCell label={t('sumNetPerMo')}  value={`+${netSalary.toLocaleString('uk-UA')}`} />
+        <SumCell label={t('sumFixPerMo')}  value={`−${monthlyFixed.toLocaleString('uk-UA')}`} />
+        <SumCell label={t('sumDayVarDay')} value={`−${dailyVariable.toLocaleString('uk-UA')}`} />
+        <SumCell label={t('sumDayVarMo')}  value={`−${(dailyVariable * 30).toLocaleString('uk-UA')}`} />
       </div>
       <div className="pt-4 border-t border-dashed" style={{ borderColor: '#1a1a1a44' }}>
-        <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-2">залишок на запас і непередбачуване</div>
+        <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-2">{t('sumSurplusLabel')}</div>
         <div className="f-display text-5xl md:text-6xl leading-none" style={{ color: negative ? '#C44536' : '#1a1a1a' }}>
           {negative ? '−' : '+'}{Math.abs(surplus).toLocaleString('uk-UA')}
           <span className="text-lg opacity-50 ml-2">грн/міс</span>
