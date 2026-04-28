@@ -1,7 +1,7 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Житездатність — симулятор',
+  title: 'Житєздатність — симулятор',
   description: '90 днів українського життя з ШІ-подіями',
 };
 

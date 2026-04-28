@@ -382,7 +382,7 @@ ${profileLines.join('\n')}
         <div className="grain relative min-h-screen w-full" style={{ background: '#F2EBE0', color: '#1a1a1a' }}>
           <div className="max-w-3xl mx-auto px-6 py-12 md:py-16">
             <div className="mb-2 f-mono text-xs uppercase tracking-widest opacity-60">№ 002 · симулятор · 2026</div>
-            <h1 className="f-display text-7xl md:text-9xl leading-[0.9] mb-4">Жите-<br/><span className="italic">здатність</span></h1>
+            <h1 className="f-display text-7xl md:text-9xl leading-[0.9] mb-4">Житє-<br/><span className="italic">здатність</span></h1>
             <p className="f-body text-base md:text-lg max-w-md opacity-80 mb-2 leading-relaxed">
               Налаштуй профіль, побач прогноз бюджету, потім дай ШІ зіграти 90 днів життя.
             </p>
