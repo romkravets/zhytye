@@ -3,7 +3,60 @@ import { NextResponse } from "next/server";
 const MAX_PROMPT_LENGTH = 3000;
 const API_TIMEOUT_MS = 20_000;
 
+// ── In-memory rate limiter ──────────────────────────────────────────────────
+// 5 requests per minute per IP. Resets automatically via sliding window.
+// For multi-instance deployments swap this for Upstash Redis.
+const RATE_LIMIT = 5;
+const RATE_WINDOW_MS = 60_000;
+/** @type {Map<string, { count: number; windowStart: number }>} */
+const rateLimitMap = new Map();
+
+function getRateLimitIp(request) {
+  // x-forwarded-for may be a comma-separated list; take the first entry.
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0].trim();
+  return request.headers.get("x-real-ip") ?? "unknown";
+}
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now - entry.windowStart > RATE_WINDOW_MS) {
+    rateLimitMap.set(ip, { count: 1, windowStart: now });
+    return true; // allowed
+  }
+
+  if (entry.count >= RATE_LIMIT) return false; // blocked
+
+  entry.count += 1;
+  return true; // allowed
+}
+
+// Clean up stale entries every hour to prevent unbounded memory growth.
+if (typeof setInterval !== "undefined") {
+  setInterval(() => {
+    const cutoff = Date.now() - RATE_WINDOW_MS;
+    for (const [ip, entry] of rateLimitMap) {
+      if (entry.windowStart < cutoff) rateLimitMap.delete(ip);
+    }
+  }, 3_600_000);
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 export async function POST(request) {
+  // Rate limit check
+  const ip = getRateLimitIp(request);
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json(
+      { events: null, error: "Too many requests. Please wait a minute." },
+      {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      },
+    );
+  }
+
   // Body size guard — prevent abuse with huge payloads
   const contentLength = request.headers.get("content-length");
   if (contentLength && parseInt(contentLength, 10) > 16 * 1024) {

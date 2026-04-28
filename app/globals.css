@@ -1,12 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;700&family=Manrope:wght@400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-.f-display { font-family: 'Instrument Serif', 'Times New Roman', serif; font-weight: 400; letter-spacing: -0.02em; }
-.f-body { font-family: 'Manrope', system-ui, sans-serif; }
-.f-mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
+.f-display { font-family: var(--font-display), 'Times New Roman', serif; font-weight: 400; letter-spacing: -0.02em; }
+.f-body { font-family: var(--font-body), system-ui, sans-serif; }
+.f-mono { font-family: var(--font-mono), 'Courier New', monospace; }
 
 .grain::before {
   content: '';
