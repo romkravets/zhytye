@@ -28,8 +28,8 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://zhytye.vercel.app'
 export const metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: 'Житєздатність — симулятор українського виживання',
-    template: '%s | Житєздатність',
+    default: 'Життєздатність — симулятор українського виживання',
+    template: '%s | Життєздатність',
   },
   description:
     '90 днів українського міського життя з ШІ-подіями. Симулятор бюджету, настрою і виживання — інтерактивна гра.',
@@ -38,17 +38,17 @@ export const metadata = {
     'simulator', 'Ukraine', 'survival', 'AI', 'game',
   ],
   openGraph: {
-    title: 'Житєздатність — симулятор',
+    title: 'Життєздатність — симулятор',
     description: '90 днів українського міського життя. ШІ-події, бюджет, виживання.',
     type: 'website',
     locale: 'uk_UA',
     alternateLocale: 'en_US',
-    siteName: 'Житєздатність',
+    siteName: 'Життєздатність',
     url: BASE_URL,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Житєздатність — симулятор',
+    title: 'Життєздатність — симулятор',
     description: '90 днів українського міського життя з ШІ-подіями.',
   },
   robots: { index: true, follow: true },

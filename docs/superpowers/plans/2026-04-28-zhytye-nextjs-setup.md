@@ -149,7 +149,7 @@ module.exports = nextConfig;
 import "./globals.css";
 
 export const metadata = {
-  title: "Житєздатність — симулятор",
+  title: "Життєздатність — симулятор",
   description: "90 днів українського життя з ШІ-подіями",
 };
 
@@ -807,7 +807,7 @@ ${profileLines.join("\n")}
               № 002 · симулятор · 2026
             </div>
             <h1 className="f-display text-7xl md:text-9xl leading-[0.9] mb-4">
-              Житє-
+              Життє-
               <br />
               <span className="italic">здатність</span>
             </h1>
