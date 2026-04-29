@@ -64,6 +64,9 @@ export default function RootLayout({ children }) {
 
   return (
     <html lang="uk" className={fontVars}>
+      <head>
+        <meta name="google-site-verification" content="TCpAsFwFwDmPDE_TPrmXp5Wl8a4ZBlygB-1qmR2uSBA" />
+      </head>
       <body>{children}</body>
     </html>
   );
