@@ -1,8 +1,8 @@
-import { Instrument_Serif, JetBrains_Mono, Manrope } from 'next/font/google';
+import { JetBrains_Mono, Manrope, Noto_Serif } from 'next/font/google';
 import './globals.css';
 
-const instrumentSerif = Instrument_Serif({
-  subsets: ['latin'],
+const notoSerif = Noto_Serif({
+  subsets: ['latin', 'cyrillic'],
   weight: '400',
   style: ['normal', 'italic'],
   variable: '--font-display',
@@ -57,7 +57,7 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   const fontVars = [
-    instrumentSerif.variable,
+    notoSerif.variable,
     jetbrainsMono.variable,
     manrope.variable,
   ].join(' ');
