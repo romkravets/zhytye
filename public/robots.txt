@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+
+User-agent: facebookexternalhit
+Allow: /
+Allow: /api/og
+
+User-agent: Twitterbot
+Allow: /
+Allow: /api/og
+
+Sitemap: https://zhytye.vercel.app/sitemap.xml

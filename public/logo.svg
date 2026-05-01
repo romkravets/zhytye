@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="100%" height="100%" rx="64" fill="#F2EBE0" />
+  <circle cx="256" cy="200" r="120" fill="#C44536" />
+  <text x="256" y="240" font-family="Noto Serif, serif" font-size="160" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">Ж</text>
+</svg>

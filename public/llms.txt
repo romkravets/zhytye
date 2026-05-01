@@ -1,0 +1,11 @@
+ChatGPT
+Google AI
+Perplexity
+Claude
+Bing Copilot
+Gemini
+Grok
+Meta AI
+Apple
+
+# llms.txt — optional file that signals AI indexers. Keep one bot name per line.
