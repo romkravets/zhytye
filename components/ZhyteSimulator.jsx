@@ -126,6 +126,9 @@ export default function ZhyteSimulator() {
   const [bday, setBday] = useState(false);
   const [holiday, setHoliday] = useState(false);
   const [savingsKey, setSavingsKey] = useState('one');
+  const [hasCredit, setHasCredit] = useState(false);
+  const [creditMode, setCreditMode] = useState('percent');
+  const [creditInput, setCreditInput] = useState('20');
 
   const [day, setDay] = useState(0);
   const [money, setMoney] = useState(0);
@@ -146,6 +149,11 @@ export default function ZhyteSimulator() {
   const housingMul = HOUSING[housing].mul;
   const salaryNum = parseInt(salary) || 0;
   const netSalary = calcNet(salaryNum, empType);
+  const monthlyCredit = hasCredit
+    ? (creditMode === 'percent'
+        ? Math.round(netSalary * (parseFloat(creditInput) || 0) / 100)
+        : (parseInt(creditInput) || 0))
+    : 0;
 
   const monthlyFixed =
     Math.round(cityData.rent * famMul * housingMul) +
@@ -153,7 +161,8 @@ export default function ZhyteSimulator() {
     TRANSPORT[transport].monthly +
     PETS[pets].monthly +
     SUBS[subs].monthly +
-    (gym ? 800 : 0);
+    (gym ? 800 : 0) +
+    monthlyCredit;
 
   const dailyVariable =
     Math.round(cityData.dailyFood * famMul) +
@@ -179,6 +188,7 @@ export default function ZhyteSimulator() {
       `зал: ${gym ? 'так' : 'ні'}`,
       `кафе: ${EATING[eating].label}`,
       `соц активність: ${FRIENDS[friends].label}`,
+      `кредит/розстрочка: ${hasCredit ? `${monthlyCredit.toLocaleString('uk-UA')} грн/міс` : 'нема'}`,
     ];
     const socEventCount = FRIENDS[friends].eventCount;
 
@@ -308,6 +318,10 @@ ${profileLines.join('\n')}
           dM -= PETS[pets].monthly;
           newLogs.push({ day: nextDay, text: t('logPets', PETS[pets].monthly), type: 'expense' });
         }
+        if (dInMonth === 20 && monthlyCredit > 0) {
+          dM -= monthlyCredit;
+          newLogs.push({ day: nextDay, text: t('logCredit', monthlyCredit), type: 'expense' });
+        }
         if (dInMonth === 15) {
           dM += netSalary;
           dMood += 3;
@@ -347,7 +361,7 @@ ${profileLines.join('\n')}
     }, 1000 / speed);
 
     return () => clearInterval(id);
-  }, [phase, isPaused, speed, events, cityData, famMul, housingMul, netSalary, dailyVariable, transport, subs, gym, pets, friends, surplus, t]);
+  }, [phase, isPaused, speed, events, cityData, famMul, housingMul, netSalary, dailyVariable, transport, subs, gym, pets, friends, surplus, monthlyCredit, t]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
@@ -427,6 +441,45 @@ ${profileLines.join('\n')}
                 {savingsMonths > 0 && (
                   <div className="f-mono text-xs opacity-60 mt-2">
                     {t('savingsHint', savingsAmount)}
+                  </div>
+                )}
+              </Field>
+              <Field label={t('fCredit')}>
+                <Toggle
+                  options={[
+                    { v: false, label: t('creditNone'), sub: '−' },
+                    { v: true,  label: t('creditYes'),  sub: t('creditYesSub') },
+                  ]}
+                  value={hasCredit} onChange={setHasCredit}
+                />
+                {hasCredit && (
+                  <div className="mt-3 pl-4 border-l-2 space-y-3" style={{ borderColor: '#1a1a1a33' }}>
+                    <div className="f-mono text-xs uppercase tracking-widest opacity-60">{t('fCreditMode')}</div>
+                    <Toggle
+                      options={[
+                        { v: 'percent', label: t('creditModePct'), sub: creditMode === 'percent' ? `≈${monthlyCredit.toLocaleString('uk-UA')} грн/міс` : '' },
+                        { v: 'fixed',   label: t('creditModeFixed'), sub: creditMode === 'fixed' ? `${monthlyCredit.toLocaleString('uk-UA')} грн/міс` : '' },
+                      ]}
+                      value={creditMode}
+                      onChange={v => { setCreditMode(v); setCreditInput(v === 'percent' ? '20' : '5000'); }}
+                    />
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="number"
+                        value={creditInput}
+                        onChange={e => setCreditInput(e.target.value)}
+                        className="f-mono text-2xl bg-transparent border-b-2 outline-none pb-1 w-28"
+                        style={{ borderColor: '#1a1a1a' }}
+                        min="0"
+                        max={creditMode === 'percent' ? '100' : '999999'}
+                        placeholder={creditMode === 'percent' ? '20' : '5000'}
+                      />
+                      <span className="f-mono text-sm opacity-60">
+                        {creditMode === 'percent'
+                          ? `% → ≈${monthlyCredit.toLocaleString('uk-UA')} ${t('uahPerMo')}`
+                          : t('uahPerMo')}
+                      </span>
+                    </div>
                   </div>
                 )}
               </Field>
@@ -518,6 +571,7 @@ ${profileLines.join('\n')}
               monthlyFixed={monthlyFixed}
               dailyVariable={dailyVariable}
               surplus={surplus}
+              monthlyCredit={monthlyCredit}
               t={t}
             />
 
@@ -606,6 +660,7 @@ ${profileLines.join('\n')}
                   <Row k={t('pNet')}     v={`${netSalary.toLocaleString('uk-UA')} грн`} />
                   <Row k={t('pSavings')} v={savingsAmount === 0 ? t('pZeroSavings') : `${savingsAmount.toLocaleString('uk-UA')} грн`} />
                   <Row k={t('pFixed')}   v={`${monthlyFixed.toLocaleString('uk-UA')} грн`} />
+                  {monthlyCredit > 0 && <Row k={t('pCredit')} v={`−${monthlyCredit.toLocaleString('uk-UA')} грн`} />}
                   <Row k={t('pDaily')}   v={`${dailyVariable.toLocaleString('uk-UA')} грн`} />
                 </div>
               </div>
@@ -724,7 +779,7 @@ function Toggle({ options, value, onChange }) {
   );
 }
 
-function Summary({ netSalary, monthlyFixed, dailyVariable, surplus, t }) {
+function Summary({ netSalary, monthlyFixed, dailyVariable, surplus, monthlyCredit, t }) {
   const negative = surplus < 0;
   const verdict =
     negative          ? t('surplusNeg') :
@@ -735,12 +790,17 @@ function Summary({ netSalary, monthlyFixed, dailyVariable, surplus, t }) {
   return (
     <div className="mt-12 pt-8 border-t-2" style={{ borderColor: '#1a1a1a' }}>
       <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-6">— {t('sSummaryTitle')} —</div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
         <SumCell label={t('sumNetPerMo')}  value={`+${netSalary.toLocaleString('uk-UA')}`} />
         <SumCell label={t('sumFixPerMo')}  value={`−${monthlyFixed.toLocaleString('uk-UA')}`} />
         <SumCell label={t('sumDayVarDay')} value={`−${dailyVariable.toLocaleString('uk-UA')}`} />
         <SumCell label={t('sumDayVarMo')}  value={`−${(dailyVariable * 30).toLocaleString('uk-UA')}`} />
       </div>
+      {monthlyCredit > 0 && (
+        <div className="f-mono text-xs opacity-60 mb-3">
+          {t('sumCreditNote', monthlyCredit)}
+        </div>
+      )}
       <div className="pt-4 border-t border-dashed" style={{ borderColor: '#1a1a1a44' }}>
         <div className="f-mono text-xs uppercase tracking-widest opacity-60 mb-2">{t('sumSurplusLabel')}</div>
         <div className="f-display text-5xl md:text-6xl leading-none" style={{ color: negative ? '#C44536' : '#1a1a1a' }}>
