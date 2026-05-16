@@ -585,8 +585,19 @@ ${profileLines.join('\n')}
               <span className="not-italic transition-transform group-hover:translate-x-2">→</span>
             </button>
 
-            <div className="mt-16 mb-8 f-mono text-xs opacity-50 max-w-md leading-relaxed">
+            <div className="mt-16 mb-2 f-mono text-xs opacity-50 max-w-md leading-relaxed">
               {t('footerNote')}
+            </div>
+            <div className="mb-8 f-mono text-xs opacity-30 max-w-md">
+              <a
+                href="https://github.com/romkravets"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:opacity-70 transition-opacity"
+                style={{ textDecoration: 'none', color: 'inherit' }}
+              >
+                github.com/romkravets
+              </a>
             </div>
           </div>
         </div>
