@@ -12,7 +12,7 @@ const ContentSecurityPolicy = [
   scriptSrc,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' data:",
-  // Anthropic is called server-side only — browser only needs same-origin API
+  // No external APIs — everything runs in the browser
   "connect-src 'self'",
   "img-src 'self' data: blob:",
   "media-src 'none'",

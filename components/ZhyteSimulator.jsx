@@ -3,106 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Pause, RotateCcw, Loader2 } from 'lucide-react';
 import { useTranslation } from '../lib/i18n';
-
-// ============== STATIC DATA ==============
-const CITIES = {
-  kyiv:     { name: 'Київ',      rent: 18000, dailyFood: 250, utilities: 2400, vibe: 'столиця' },
-  lviv:     { name: 'Львів',     rent: 14000, dailyFood: 220, utilities: 2000, vibe: 'захід'   },
-  dnipro:   { name: 'Дніпро',    rent: 11000, dailyFood: 200, utilities: 1900, vibe: 'центр'   },
-  ternopil: { name: 'Тернопіль', rent: 8000,  dailyFood: 180, utilities: 1700, vibe: 'тихе'    },
-  village:  { name: 'Село',      rent: 3000,  dailyFood: 130, utilities: 1500, vibe: 'хутір'   },
-};
-
-const EMP_TYPES = {
-  emp_official: { label: 'найманий, офіц.', sub: '−23%'        },
-  emp_envelope: { label: 'у конверті',      sub: '0% податків' },
-  fop1:         { label: 'ФОП 1 гр.',       sub: '−3 100/міс'  },
-  fop2:         { label: 'ФОП 2 гр.',       sub: '−4 495/міс'  },
-  fop3:         { label: 'ФОП 3 гр.',       sub: '−5%'         },
-  diia_city:    { label: 'Дія.City',        sub: '−5%'         },
-};
-
-const HOUSING = {
-  rent:    { label: 'оренда',    mul: 1, sub: 'повна вартість' },
-  own:     { label: 'своє',      mul: 0, sub: 'без оренди'     },
-  parents: { label: 'у батьків', mul: 0, sub: 'без оренди'     },
-};
-
-const TRANSPORT = {
-  none:   { label: 'без',          monthly: 0,    daily: 0,   sub: 'пішки/велосипед' },
-  public: { label: 'громадський',  monthly: 600,  daily: 0,   sub: 'проїзний'        },
-  car:    { label: 'власне авто',  monthly: 2500, daily: 200, sub: 'паливо+ТО'       },
-  mixed:  { label: 'мікс',         monthly: 600,  daily: 60,  sub: 'трохи всього'    },
-  taxi:   { label: 'таксі',        monthly: 0,    daily: 130, sub: 'болт/уклон'      },
-};
-
-const PETS = {
-  none: { label: 'нема',         monthly: 0    },
-  cat:  { label: 'кіт',          monthly: 800  },
-  dog:  { label: 'собака',       monthly: 1500 },
-  both: { label: 'кіт + собака', monthly: 2200 },
-};
-
-const SUBS = {
-  none:  { label: 'нема',   monthly: 0,    sub: ''                },
-  light: { label: 'кілька', monthly: 350,  sub: 'нетфлікс+спотіф' },
-  heavy: { label: 'усі',    monthly: 1200, sub: '+ChatGPT, iCloud' },
-};
-
-const EATING = {
-  never:     { label: 'майже ніколи', daily: 0   },
-  sometimes: { label: 'іноді',        daily: 50  },
-  often:     { label: 'часто',        daily: 130 },
-};
-
-const FRIENDS = {
-  low:    { label: 'мало',      socFactor: 0.6, eventCount: 1 },
-  normal: { label: 'нормально', socFactor: 1.0, eventCount: 2 },
-  high:   { label: 'часто',     socFactor: 1.5, eventCount: 3 },
-};
-
-const FAMILY = {
-  single:  { label: 'сам',        mul: 1   },
-  partner: { label: 'у парі',     mul: 1.6 },
-  kid:     { label: 'з дитиною',  mul: 1.9 },
-};
-
-const SIM_DAYS = 90;
-
-const SAVINGS_PRESETS = [
-  { key: 'zero',  label: '0',       months: 0 },
-  { key: 'one',   label: '1 міс',   months: 1 },
-  { key: 'three', label: '3 міс',   months: 3 },
-  { key: 'six',   label: '6 міс',   months: 6 },
-];
-
-// ============== HELPERS ==============
-function calcNet(gross, type) {
-  switch (type) {
-    case 'emp_official': return Math.round(gross * 0.77);
-    case 'emp_envelope': return gross;
-    case 'fop1':         return Math.max(0, gross - 3100);
-    case 'fop2':         return Math.max(0, gross - 4495);
-    case 'fop3':         return Math.round(gross * 0.95);
-    case 'diia_city':    return Math.round(gross * 0.95);
-    default:             return gross;
-  }
-}
-
-const FALLBACK_EVENTS = [
-  { day: 4,  title: 'Розбив екран телефону',       moneyChange: -800,  moodChange: -10, healthChange: 0,   socialChange: 0  },
-  { day: 9,  title: 'Колеги кличуть на каву',       moneyChange: -250,  moodChange: 5,   healthChange: 0,   socialChange: 10 },
-  { day: 14, title: 'Блекаут на дві доби',          moneyChange: -200,  moodChange: -8,  healthChange: -3,  socialChange: 0  },
-  { day: 19, title: 'Знайшов 200 грн у куртці',     moneyChange: 200,   moodChange: 8,   healthChange: 0,   socialChange: 0  },
-  { day: 26, title: 'Подарунок мамі на ДН',         moneyChange: -1200, moodChange: 7,   healthChange: 0,   socialChange: 8  },
-  { day: 33, title: 'Застудився, ліки',             moneyChange: -600,  moodChange: -10, healthChange: -12, socialChange: -5 },
-  { day: 41, title: 'Стрижка',                      moneyChange: -300,  moodChange: 5,   healthChange: 0,   socialChange: 3  },
-  { day: 48, title: 'Тривога всю ніч, не виспався', moneyChange: 0,     moodChange: -8,  healthChange: -5,  socialChange: 0  },
-  { day: 56, title: 'Друг з фронту приїхав',        moneyChange: -400,  moodChange: 4,   healthChange: 0,   socialChange: 15 },
-  { day: 64, title: 'Ремонт побутової техніки',     moneyChange: -1100, moodChange: -3,  healthChange: 0,   socialChange: 0  },
-  { day: 72, title: 'Куртка розлізлась, нова',      moneyChange: -2500, moodChange: -5,  healthChange: 0,   socialChange: 0  },
-  { day: 80, title: 'Премія за квартал',            moneyChange: 1500,  moodChange: 12,  healthChange: 0,   socialChange: 0  },
-];
+import {
+  calcNet, calcMonthlyFixed, calcDailyVariable, calcDailyDeltas, generateEvents,
+  SIM_DAYS, BANKRUPTCY_THRESHOLD, GYM_MONTHLY,
+  CITIES, EMP_TYPES, HOUSING, TRANSPORT, PETS, SUBS, EATING, FRIENDS, FAMILY, SAVINGS_PRESETS,
+} from '../lib/gameLogic';
 
 // ============== APP ==============
 export default function ZhyteSimulator() {
@@ -142,6 +47,8 @@ export default function ZhyteSimulator() {
   const [verdict, setVerdict] = useState(null);
 
   const appliedDaysRef = useRef(new Set());
+  const moneyRef = useRef(0);
+  moneyRef.current = money;
   const logRef = useRef(null);
 
   const cityData = CITIES[city];
@@ -156,66 +63,14 @@ export default function ZhyteSimulator() {
     : 0;
 
   const monthlyFixed =
-    Math.round(cityData.rent * famMul * housingMul) +
-    cityData.utilities +
-    TRANSPORT[transport].monthly +
-    PETS[pets].monthly +
-    SUBS[subs].monthly +
-    (gym ? 800 : 0) +
-    monthlyCredit;
+    calcMonthlyFixed({ city, family, housing, transport, pets, subs, gym }) + monthlyCredit;
 
-  const dailyVariable =
-    Math.round(cityData.dailyFood * famMul) +
-    TRANSPORT[transport].daily +
-    EATING[eating].daily;
+  const dailyVariable = calcDailyVariable({ city, family, transport, eating });
 
   const monthlyEstimate = monthlyFixed + dailyVariable * 30;
   const surplus = netSalary - monthlyEstimate;
   const savingsMonths = SAVINGS_PRESETS.find(p => p.key === savingsKey)?.months ?? 1;
   const savingsAmount = Math.round(netSalary * savingsMonths);
-
-  // ============== AI EVENTS ==============
-  async function generateEvents() {
-    const profileLines = [
-      `місто: ${cityData.name} (${cityData.vibe})`,
-      `зайнятість: ${EMP_TYPES[empType].label}`,
-      `на руки: ~${netSalary.toLocaleString('uk-UA')} грн/міс`,
-      `сімейний: ${FAMILY[family].label}`,
-      `житло: ${HOUSING[housing].label}`,
-      `транспорт: ${TRANSPORT[transport].label}`,
-      `тварини: ${PETS[pets].label}`,
-      `підписки: ${SUBS[subs].label}`,
-      `зал: ${gym ? 'так' : 'ні'}`,
-      `кафе: ${EATING[eating].label}`,
-      `соц активність: ${FRIENDS[friends].label}`,
-      `кредит/розстрочка: ${hasCredit ? `${monthlyCredit.toLocaleString('uk-UA')} грн/міс` : 'нема'}`,
-    ];
-    const socEventCount = FRIENDS[friends].eventCount;
-
-    const prompt = `Згенеруй рівно 10 коротких життєвих подій для українця у 2026 році. Реальні дрібниці з урахуванням війни і профілю:
-
-${profileLines.join('\n')}
-
-Дні від 3 до 87, всі різні і несортовані. Події ОБОВʼЯЗКОВО мають враховувати лайфстайл (якщо є авто — щось з ним; якщо кіт — ветеринар чи корм; якщо підписки — раптове списання; якщо ходить у зал — травма чи нова форма).
-
-Поверни ТІЛЬКИ валідний JSON масив. Без тексту до чи після, без markdown:
-[{"day":5,"title":"заголовок до 38 символів українською","moneyChange":-300,"moodChange":-5,"healthChange":0,"socialChange":3}]
-
-Розподіл: 2 дрібниці лайфстайлу, ${socEventCount} соціальні події, 1 здоровʼя, 1 війна (блекаут/тривога/інтернет), 1 +гроші сюрприз, решта побутові несподіванки. Числа реалістичні для України (200–3000 грн).`;
-
-    try {
-      const res = await fetch('/api/generate-events', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
-      });
-      const data = await res.json();
-      if (Array.isArray(data.events) && data.events.length >= 5) return data.events;
-    } catch (e) {
-      console.warn('AI events failed, using fallback:', e);
-    }
-    return FALLBACK_EVENTS;
-  }
 
   async function startSim() {
     setPhase('loading');
@@ -225,16 +80,11 @@ ${profileLines.join('\n')}
     const msgInt = setInterval(() => {
       i = (i + 1) % messages.length;
       setLoadMsg(messages[i]);
-    }, 800);
+    }, 400);
 
-    let evs = await generateEvents();
-
-    if (bday) {
-      evs = [...evs.filter(e => e.day !== 28), { day: 28, title: 'Мій день народження', moneyChange: -2500, moodChange: 15, healthChange: 0, socialChange: 25 }];
-    }
-    if (holiday) {
-      evs = [...evs.filter(e => e.day !== 60), { day: 60, title: 'Велике свято в родині', moneyChange: -3000, moodChange: 12, healthChange: 0, socialChange: 20 }];
-    }
+    const evs = generateEvents({ city, housing, transport, pets, subs, gym, eating, family, friends, bday, holiday });
+    // коротка пауза — суто для атмосфери «долю тягнемо»
+    await new Promise(r => setTimeout(r, 1200));
 
     clearInterval(msgInt);
     setEvents(evs);
@@ -265,7 +115,6 @@ ${profileLines.join('\n')}
   // ============== GAME LOOP ==============
   useEffect(() => {
     if (phase !== 'playing' || isPaused) return;
-    const socFactor = FRIENDS[friends].socFactor;
 
     const id = setInterval(() => {
       setDay(prevDay => {
@@ -280,14 +129,10 @@ ${profileLines.join('\n')}
 
         const newLogs = [];
         let dM = 0;
-        let dMood = -0.5;
-        let dHealth = -0.3;
-        let dSocial = -1.0 / socFactor;
-
-        // Фінансовий буфер знижує стрес: великий залишок → менший спад настрою
-        if (surplus > 20000) dMood += 0.15;
-        else if (surplus > 8000) dMood += 0.08;
-        else if (surplus > 3000) dMood += 0.03;
+        const drift = calcDailyDeltas({ gym, eating, transport, pets, family, friends, surplus, money: moneyRef.current });
+        let dMood = drift.mood;
+        let dHealth = drift.health;
+        let dSocial = drift.social;
 
         dM -= dailyVariable;
 
@@ -303,7 +148,7 @@ ${profileLines.join('\n')}
         if (dInMonth === 3) {
           const trM = TRANSPORT[transport].monthly;
           const subM = SUBS[subs].monthly;
-          const gymM = gym ? 800 : 0;
+          const gymM = gym ? GYM_MONTHLY : 0;
           const fixedExtra = trM + subM + gymM;
           if (fixedExtra > 0) {
             dM -= fixedExtra;
@@ -361,14 +206,14 @@ ${profileLines.join('\n')}
     }, 1000 / speed);
 
     return () => clearInterval(id);
-  }, [phase, isPaused, speed, events, cityData, famMul, housingMul, netSalary, dailyVariable, transport, subs, gym, pets, friends, surplus, monthlyCredit, t]);
+  }, [phase, isPaused, speed, events, cityData, famMul, housingMul, netSalary, dailyVariable, transport, subs, gym, pets, friends, eating, family, surplus, monthlyCredit, t]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
     if (day >= SIM_DAYS) {
       setVerdict({ status: 'survived', day, money, mood, health, social });
       setPhase('gameover');
-    } else if (money < -8000) {
+    } else if (money < BANKRUPTCY_THRESHOLD) {
       setVerdict({ status: 'bankrupt', day, money, mood, health, social });
       setPhase('gameover');
     } else if (health <= 0) {
@@ -532,7 +377,7 @@ ${profileLines.join('\n')}
                 <Toggle
                   options={[
                     { v: false, label: 'ні',  sub: '−'       },
-                    { v: true,  label: 'так', sub: '800/міс' },
+                    { v: true,  label: 'так', sub: `${GYM_MONTHLY}/міс` },
                   ]}
                   value={gym} onChange={setGym}
                 />

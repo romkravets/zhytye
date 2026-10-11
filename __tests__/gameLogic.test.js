@@ -281,3 +281,152 @@ describe("sanitizeEvent", () => {
     expect(out.socialChange).toBe(0);
   });
 });
+
+// ============================================================
+// calcDailyDeltas
+// ============================================================
+describe("calcDailyDeltas", () => {
+  const { calcDailyDeltas } = require("../lib/gameLogic");
+  const base = {
+    gym: false,
+    eating: "sometimes",
+    transport: "public",
+    pets: "none",
+    family: "single",
+    friends: "normal",
+    surplus: 0,
+    money: 1000,
+  };
+
+  test("baseline profile matches the old constant drift", () => {
+    const d = calcDailyDeltas(base);
+    expect(d.health).toBeCloseTo(-0.3);
+    expect(d.mood).toBeCloseTo(-0.5);
+    expect(d.social).toBeCloseTo(-1.0);
+  });
+
+  test("gym improves health and mood", () => {
+    const withGym = calcDailyDeltas({ ...base, gym: true });
+    const without = calcDailyDeltas(base);
+    expect(withGym.health).toBeGreaterThan(without.health);
+    expect(withGym.mood).toBeGreaterThan(without.mood);
+  });
+
+  test("eating out often and taxi hurt health", () => {
+    const lazy = calcDailyDeltas({ ...base, eating: "often", transport: "taxi" });
+    expect(lazy.health).toBeLessThan(calcDailyDeltas(base).health);
+  });
+
+  test("walking/bike improves health", () => {
+    expect(calcDailyDeltas({ ...base, transport: "none" }).health).toBeGreaterThan(
+      calcDailyDeltas(base).health,
+    );
+  });
+
+  test("being in debt adds stress", () => {
+    const debt = calcDailyDeltas({ ...base, money: -100 });
+    expect(debt.mood).toBeLessThan(calcDailyDeltas(base).mood);
+    expect(debt.health).toBeLessThan(calcDailyDeltas(base).health);
+  });
+
+  test("financial buffer softens mood decline", () => {
+    expect(calcDailyDeltas({ ...base, surplus: 25000 }).mood).toBeGreaterThan(
+      calcDailyDeltas({ ...base, surplus: 1000 }).mood,
+    );
+  });
+
+  test("90-day health spread: active vs sedentary lifestyles differ a lot", () => {
+    const active = calcDailyDeltas({ ...base, gym: true, transport: "none", eating: "never" });
+    const lazy = calcDailyDeltas({ ...base, eating: "often", transport: "taxi", surplus: -1000 });
+    expect((active.health - lazy.health) * SIM_DAYS).toBeGreaterThan(30);
+  });
+});
+
+// ============================================================
+// generateEvents (local, no AI)
+// ============================================================
+describe("generateEvents", () => {
+  const { generateEvents, createRng } = require("../lib/gameLogic");
+  const profile = {
+    city: "lviv",
+    housing: "rent",
+    transport: "car",
+    pets: "cat",
+    subs: "light",
+    gym: false,
+    eating: "sometimes",
+    family: "single",
+    friends: "normal",
+    bday: false,
+    holiday: false,
+  };
+
+  test("returns 10 events with unique days in 3..87, sorted", () => {
+    const evs = generateEvents(profile, createRng(1));
+    expect(evs).toHaveLength(10);
+    const days = evs.map((e) => e.day);
+    expect(new Set(days).size).toBe(10);
+    days.forEach((d) => {
+      expect(d).toBeGreaterThanOrEqual(3);
+      expect(d).toBeLessThanOrEqual(87);
+    });
+    expect([...days].sort((a, b) => a - b)).toEqual(days);
+  });
+
+  test("same seed → same events, different seed → different events", () => {
+    expect(generateEvents(profile, createRng(42))).toEqual(
+      generateEvents(profile, createRng(42)),
+    );
+    expect(generateEvents(profile, createRng(1))).not.toEqual(
+      generateEvents(profile, createRng(2)),
+    );
+  });
+
+  test("total health impact varies between runs", () => {
+    const totals = new Set();
+    for (let seed = 1; seed <= 20; seed++) {
+      totals.add(
+        generateEvents(profile, createRng(seed)).reduce((s, e) => s + e.healthChange, 0),
+      );
+    }
+    expect(totals.size).toBeGreaterThan(1);
+  });
+
+  test("lifestyle events respect the profile (no car events without a car)", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const titles = generateEvents(
+        { ...profile, transport: "public", pets: "none" },
+        createRng(seed),
+      ).map((e) => e.title);
+      expect(titles.join("|")).not.toMatch(/авто|паркування|гуми|кот|Кіт|Ветеринар/);
+    }
+  });
+
+  test("gym softens negative health events (cold: −12 → −7)", () => {
+    const coldHit = (gym) => {
+      for (let seed = 1; seed <= 200; seed++) {
+        const cold = generateEvents({ ...profile, gym }, createRng(seed)).find(
+          (e) => e.title === "Застудився, ліки",
+        );
+        if (cold) return cold.healthChange;
+      }
+      throw new Error("cold event never rolled");
+    };
+    expect(coldHit(false)).toBe(-12);
+    expect(coldHit(true)).toBe(-7);
+  });
+
+  test("birthday and holiday land on fixed days without collisions", () => {
+    const evs = generateEvents({ ...profile, bday: true, holiday: true }, createRng(7));
+    expect(evs).toHaveLength(12);
+    expect(evs.filter((e) => e.day === 28)).toHaveLength(1);
+    expect(evs.find((e) => e.day === 28).title).toBe("Мій день народження");
+    expect(evs.filter((e) => e.day === 60)).toHaveLength(1);
+  });
+
+  test("money changes are multiples of 50", () => {
+    generateEvents(profile, createRng(3)).forEach((e) => {
+      expect(Math.abs(e.moneyChange) % 50).toBe(0);
+    });
+  });
+});
